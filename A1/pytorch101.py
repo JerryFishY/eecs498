@@ -675,7 +675,8 @@ def challenge_mean_tensors(xs: List[Tensor], ls: Tensor) -> Tensor:
     # mean values as a tensor in `y`.                                        #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    xs_pad = torch.nn.utils.rnn.pad_sequence(xs, batch_first=True)
+    y=xs_pad.sum(dim=1)/ls
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -715,7 +716,13 @@ def challenge_get_uniques(x: torch.Tensor) -> Tuple[Tensor, Tensor]:
     # O(N) memory.                                                           #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    sorted_x, sorted_indices = x.sort()
+    print('here is sorted x:',sorted_x)
+    print('here is sorted_indices:',sorted_indices)
+    mask=torch.cat((torch.tensor([True]),sorted_x[1:]!=sorted_x[:-1]))
+    print('here is mask:',mask)
+    uniques=sorted_x[mask]
+    indices=sorted_indices[mask]
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
