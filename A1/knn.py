@@ -60,7 +60,13 @@ def compute_distances_two_loops(x_train: torch.Tensor, x_test: torch.Tensor):
     # functions from torch.nn or torch.nn.functional.                        #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    
+    for i in range(num_train):
+      for j in range(num_test):
+        train_p=x_train[i].view(-1)
+        test_p=x_test[j].view(-1)
+        dists[i][j]=(((test_p-train_p)**2).sum())**(1/2)
+    
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################
@@ -104,7 +110,11 @@ def compute_distances_one_loop(x_train: torch.Tensor, x_test: torch.Tensor):
     # functions from torch.nn or torch.nn.functional.                        #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    for i in range(num_train):
+      train_p=x_train[i].view(1,-1)
+      test_vec_p=x_test.view(num_test,-1)
+      dists[i]=(((train_p-test_vec_p)**2).sum(dim=1))**(1/2)
+    
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################
@@ -156,7 +166,11 @@ def compute_distances_no_loops(x_train: torch.Tensor, x_test: torch.Tensor):
     #       and a matrix multiply.                                           #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    x_train=x_train.cuda()
+    x_test=x_test.cuda()
+    dists=dists.cuda()
+    dists=((((x_train.unsqueeze(1)-x_test)**2).sum(dim=(2,3,4)))**(1/2))
+    dists=dists.cpu()
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################
