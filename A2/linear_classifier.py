@@ -169,11 +169,11 @@ def svm_loss_naive(
                 # at the same time that the loss is being computed.                   #
                 #######################################################################
                 # Replace "pass" statement with your code
-                pass
+                dW[:,j]+=X[i,:]
+                dW[:,y[i]]-=X[i,:]
                 #######################################################################
                 #                       END OF YOUR CODE                              #
                 #######################################################################
-
     # Right now the loss is a sum over all training examples, but we want it
     # to be an average instead so we divide by num_train.
     loss /= num_train
@@ -187,7 +187,8 @@ def svm_loss_naive(
     # and add it to dW. (part 2)                                                #
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+    dW/=num_train
+    dW+=2*reg*W
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -223,7 +224,15 @@ def svm_loss_vectorized(
     # result in loss.                                                           #
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+    num_classes=W.shape[1]
+    num_train=X.shape[0]
+
+    scores=torch.mm(X,W)
+
+    margins=torch.max(torch.zeros_like(scores),scores-scores[torch.arange(num_train),y].view(-1,1)+1)
+    margins[torch.arange(num_train),y]=0
+    
+    loss=torch.sum(margins)/num_train+reg*torch.sum(W*W)
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -238,7 +247,10 @@ def svm_loss_vectorized(
     # loss.                                                                     #
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+    margins[margins>0]=1
+    margins[torch.arange(num_train),y]-=torch.sum(margins,dim=1)
+    
+    dW+=torch.mm(X.t(),margins)/num_train+2*reg*W
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -263,7 +275,10 @@ def sample_batch(
     # Hint: Use torch.randint to generate indices.                          #
     #########################################################################
     # Replace "pass" statement with your code
-    pass
+    indices=torch.randint(0,num_train,(batch_size,))
+
+    X_batch = X[indices,:]
+    y_batch = y[indices] 
     #########################################################################
     #                       END OF YOUR CODE                                #
     #########################################################################
@@ -331,7 +346,7 @@ def train_linear_classifier(
         # Update the weights using the gradient and the learning rate.          #
         #########################################################################
         # Replace "pass" statement with your code
-        pass
+        W-=learning_rate*grad
         #########################################################################
         #                       END OF YOUR CODE                                #
         #########################################################################
