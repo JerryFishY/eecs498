@@ -1,0 +1,5 @@
+*.tar.gz
+*.pt
+*.pyc
+cifar-10-batches-py
+*checkpoint*
