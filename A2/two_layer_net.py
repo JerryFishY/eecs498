@@ -147,7 +147,11 @@ def nn_forward_pass(params: Dict[str, torch.Tensor], X: torch.Tensor):
     # shape (N, C).                                                            #
     ############################################################################
     # Replace "pass" statement with your code
-    pass
+    H=W1.shape[1]
+
+    hidden = torch.max(torch.mm(X,W1)+b1,torch.zeros(N,H,device=W1.device))
+    
+    scores = torch.mm(hidden,W2)+b2
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -212,7 +216,11 @@ def nn_forward_backward(
     # (Check Numeric Stability in http://cs231n.github.io/linear-classify/).   #
     ############################################################################
     # Replace "pass" statement with your code
-    pass
+    correct_scores = scores[torch.arange(N),y]
+    norm_factor,_ = torch.max(scores,dim=1)
+
+    loss=torch.sum(-torch.log(torch.exp(correct_scores-norm_factor)/torch.sum(torch.exp(scores-norm_factor.view(-1,1)),dim=1)))
+    loss=loss/N+reg*torch.sum(W1*W1)+reg*torch.sum(W2*W2)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -226,7 +234,44 @@ def nn_forward_backward(
     # tensor of same size                                                     #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    # L=Loss(Y) dLdY=  
+    # Y=HW2+b2  dW2 dLdH=dLdY*W2.t()    
+    # H=ReLU(A)     
+    # A=XW1+b1      
+
+    dW1=torch.zeros_like(W1)
+    dW2=torch.zeros_like(W2)
+    db1=torch.zeros_like(b1)
+    db2=torch.zeros_like(b2)
+    
+
+    
+    dY=torch.zeros_like(scores)
+    
+    dY=torch.exp(scores-norm_factor.view(-1,1))/torch.sum(torch.exp(scores-norm_factor.view(-1,1)),dim=1,keepdim=True)
+    dY[torch.arange(N),y]=-1+torch.exp(correct_scores-norm_factor)/torch.sum(torch.exp(scores-norm_factor.view(-1,1)),dim=1)
+
+    dW2=torch.mm(h1.t(),dY)
+    dW2=dW2/N+2*reg*W2
+
+    db2=dY.sum(dim=0)
+    db2=db2/N+2*reg*b2
+
+    dH=torch.mm(dY,W2.t())
+    ReLud=torch.zeros_like(h1)
+    ReLud[h1>0]=1
+
+    dZ=dH*ReLud
+    dW1=torch.mm(X.t(),dZ)
+    dW1=dW1/N+2*reg*W1
+
+    db1=dZ.sum(dim=0)
+    db1=db1/N+2*reg*b1
+
+    grads['W2']=dW2
+    grads['W1']=dW1
+    grads['b2']=db2
+    grads['b1']=db1
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -307,7 +352,10 @@ def nn_train(
         # stored in the grads dictionary defined above.                         #
         #########################################################################
         # Replace "pass" statement with your code
-        pass
+        params['W1']-=learning_rate*grads['W1']
+        params['W2']-=learning_rate*grads['W2']
+        params['b1']-=learning_rate*grads['b1']
+        params['b2']-=learning_rate*grads['b2']
         #########################################################################
         #                             END OF YOUR CODE                          #
         #########################################################################
@@ -365,7 +413,8 @@ def nn_predict(
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    scores=loss_func(params,X)
+    y_pred=torch.argmax(scores,dim=1)
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
@@ -399,7 +448,10 @@ def nn_get_search_params():
     # classifier.                                                             #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    learning_rates=[1e-3,1e-2,1e-2,1,10]
+    hidden_sizes=[2,8,32,128,512,2048]
+    regularization_strengths=[0, 1e-5, 1e-3, 1e-1,1]
+    learning_rate_decays=[0.95,0.85]
     ###########################################################################
     #                           END OF YOUR CODE                              #
     ###########################################################################
@@ -460,7 +512,27 @@ def find_best_net(
     # automatically like we did on the previous exercises.                      #
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+    i=0
+    learning_rates_set,hidden_sizes_set,regularization_strengths_set,learning_rate_decays_set=get_param_set_fn()
+    for learning_rates in learning_rates_set:
+        for hidden_size in hidden_sizes_set:
+             for regularization_strength in regularization_strengths_set:
+                 for learning_rate_decay in learning_rate_decays_set:
+                    i+=1
+                    print(f'parameter set {i}: training train with learning rate: {learning_rates}, hidden size: {hidden_size}, regularization strength: {regularization_strength}, learning rate decay: {learning_rate_decay}')
+                    net = TwoLayerNet(3 * 32 * 32, hidden_size, 10, device=data_dict['X_train'].device, dtype=data_dict['X_train'].dtype)
+                    stats = net.train(data_dict['X_train'], data_dict['y_train'], data_dict['X_val'], data_dict['y_val'],
+                    num_iters=3000, batch_size=1000,
+                    learning_rate=learning_rates, learning_rate_decay=learning_rate_decay,
+                    reg=regularization_strength, verbose=False)
+                    cur_test_acc=stats['train_acc_history'][-1]
+                    cur_val_acc=stats['val_acc_history'][-1]
+                    print(f"test acc for current parameter set: {cur_test_acc} val acc or current parameter set: {cur_val_acc}")
+                    if cur_val_acc>best_val_acc:
+                        best_val_acc=cur_val_acc
+                        best_stat=stats
+                        best_net=net
+
     #############################################################################
     #                               END OF YOUR CODE                            #
     #############################################################################
