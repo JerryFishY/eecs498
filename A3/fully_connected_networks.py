@@ -367,7 +367,7 @@ class FullyConnectedNet(object):
         dim_list=[input_dim]+hidden_dims+[num_classes]
         for i in range(self.num_layers):
             W=weight_scale*torch.randn(dim_list[i],dim_list[i+1],device=device,dtype=dtype)
-            b=torch.zeros_like(dim_list[i+1])
+            b=torch.zeros(dim_list[i+1],dtype=dtype,device=device)
             self.params[f'W{i+1}']=W
             self.params[f'b{i+1}']=b
         #######################################################################
@@ -433,7 +433,20 @@ class FullyConnectedNet(object):
         # to each dropout forward pass.                                  #
         ##################################################################
         # Replace "pass" statement with your code
-        pass
+        cache_list=[]
+        hidden,tmp_cache=X,None
+        for i in range(1,self.num_layers):
+          W=self.params[f'W{i}']
+          b=self.params[f'b{i}'] 
+          hidden,tmp_cache=Linear_ReLU.forward(hidden,W,b)
+          cache_list.append(tmp_cache)
+
+        W=self.params[f'W{self.num_layers}']
+        b=self.params[f'b{self.num_layers}']
+
+        scores,tmp_cache=Linear.forward(hidden,W,b)
+        cache_list.append(tmp_cache)
+
         #################################################################
         #                      END OF YOUR CODE                         #
         #################################################################
@@ -455,7 +468,13 @@ class FullyConnectedNet(object):
         # the gradient.                                                     #
         #####################################################################
         # Replace "pass" statement with your code
-        pass
+        loss,dout=softmax_loss(scores,y)
+
+        dout,grads[f'W{self.num_layers}'],grads[f'b{self.num_layers}']=Linear.backward(dout,cache_list[self.num_layers-1])
+        
+        for i in range(self.num_layers-1,0,-1):
+            dout,grads[f'W{i}'],grads[f'b{i}']=Linear_ReLU.backward(dout,cache_list[i-1])
+            
         ###########################################################
         #                   END OF YOUR CODE                      #
         ###########################################################
@@ -471,7 +490,14 @@ def create_solver_instance(data_dict, dtype, device):
     #############################################################
     solver = None
     # Replace "pass" statement with your code
-    pass
+    config_dict={
+        'optim_config':{'learning_rate': 1e-3},
+        'lr_decay':1.0,
+        'num_epochs':1000,
+        'device':device
+    }
+    solver=Solver(model,data_dict,**config_dict)
+    
     ##############################################################
     #                    END OF YOUR CODE                        #
     ##############################################################
@@ -483,10 +509,10 @@ def get_three_layer_network_params():
     # TODO: Change weight_scale and learning_rate so your         #
     # model achieves 100% training accuracy within 20 epochs.     #
     ###############################################################
-    weight_scale = 1e-2   # Experiment with this!
-    learning_rate = 1e-4  # Experiment with this!
+    weight_scale = 1e-1   # Experiment with this!
+    learning_rate = 1e-1  # Experiment with this!
     # Replace "pass" statement with your code
-    pass
+    
     ################################################################
     #                             END OF YOUR CODE                 #
     ################################################################
@@ -498,8 +524,8 @@ def get_five_layer_network_params():
     # TODO: Change weight_scale and learning_rate so your          #
     # model achieves 100% training accuracy within 20 epochs.      #
     ################################################################
-    learning_rate = 2e-3  # Experiment with this!
-    weight_scale = 1e-5   # Experiment with this!
+    learning_rate = 2e-1  # Experiment with this!
+    weight_scale = 1e-1   # Experiment with this!
     # Replace "pass" statement with your code
     pass
     ################################################################

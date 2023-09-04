@@ -4,3 +4,4 @@
 cifar-10-batches-py
 *checkpoint*
 mnist*/
+*.pth
