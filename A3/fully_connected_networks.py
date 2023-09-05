@@ -434,12 +434,16 @@ class FullyConnectedNet(object):
         ##################################################################
         # Replace "pass" statement with your code
         cache_list=[]
+        dropout_cache_list=[]
         hidden,tmp_cache=X,None
         for i in range(1,self.num_layers):
           W=self.params[f'W{i}']
           b=self.params[f'b{i}'] 
           hidden,tmp_cache=Linear_ReLU.forward(hidden,W,b)
           cache_list.append(tmp_cache)
+          if self.use_dropout:
+            hidden,dp_tmp_cache=Dropout.forward(hidden,self.dropout_param)
+            dropout_cache_list.append(dp_tmp_cache)
 
         W=self.params[f'W{self.num_layers}']
         b=self.params[f'b{self.num_layers}']
@@ -473,6 +477,8 @@ class FullyConnectedNet(object):
         dout,grads[f'W{self.num_layers}'],grads[f'b{self.num_layers}']=Linear.backward(dout,cache_list[self.num_layers-1])
         
         for i in range(self.num_layers-1,0,-1):
+            if self.use_dropout:
+                dout=Dropout.backward(dout,dropout_cache_list[i-1])
             dout,grads[f'W{i}'],grads[f'b{i}']=Linear_ReLU.backward(dout,cache_list[i-1])
             
         ###########################################################
@@ -571,7 +577,10 @@ def sgd_momentum(w, dw, config=None):
     # update the velocity v.                                         #
     ##################################################################
     # Replace "pass" statement with your code
-    pass
+    momentum,learning_rate=config['momentum'],config['learning_rate']
+    
+    v=momentum*v-learning_rate*dw
+    next_w=w+v
     ###################################################################
     #                           END OF YOUR CODE                      #
     ###################################################################
@@ -605,7 +614,11 @@ def rmsprop(w, dw, config=None):
     # config['cache'].                                                        #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    learning_rate,decay_rate,epsilon,cache=config['learning_rate'],config['decay_rate'],config['epsilon'],config['cache']
+    cache=decay_rate*cache+(1-decay_rate)*dw*dw
+    next_w=w-learning_rate*dw/torch.sqrt(cache+epsilon)
+
+    config['cache']=cache
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -646,7 +659,16 @@ def adam(w, dw, config=None):
     # using it in any calculations.                                          #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    learning_rate,beta1,beta2,epsilon,m,v,t=config['learning_rate'],config['beta1'],config['beta2'],config['epsilon'],config['m'],config['v'],config['t']
+    m=beta1*m+(1-beta1)*dw
+    v=beta2*v+(1-beta2)*dw*dw
+    m_hat=m/(1-beta1**(t+1))
+    v_hat=v/(1-beta2**(t+1))
+    next_w=w-learning_rate*m_hat/((v_hat)**(1/2)+epsilon)
+    
+    config['m']=m
+    config['v']=v
+    config['t']=t+1
     #########################################################################
     #                              END OF YOUR CODE                         #
     #########################################################################
@@ -699,7 +721,8 @@ class Dropout(object):
             # Store the dropout mask in the mask variable.               #
             ##############################################################
             # Replace "pass" statement with your code
-            pass
+            mask=torch.tensor((torch.rand(x.shape,device=x.device)>p))
+            out=x*mask/(1-p)
             ##############################################################
             #                   END OF YOUR CODE                         #
             ##############################################################
@@ -709,7 +732,7 @@ class Dropout(object):
             # inverted dropout.                                          #
             ##############################################################
             # Replace "pass" statement with your code
-            pass
+            out=x
             ##############################################################
             #                      END OF YOUR CODE                      #
             ##############################################################
@@ -736,7 +759,8 @@ class Dropout(object):
             # inverted dropout                                        #
             ###########################################################
             # Replace "pass" statement with your code
-            pass
+          p=dropout_param['p']
+          dx=mask*dout/(1-p)
             ###########################################################
             #                     END OF YOUR CODE                    #
             ###########################################################

@@ -51,7 +51,8 @@ class Conv(object):
         # You are NOT allowed to use anything in torch.nn in other places. #
         ####################################################################
         # Replace "pass" statement with your code
-        pass
+        stride,pad=conv_param['stride'],conv_param['pad']
+        
         #####################################################################
         #                          END OF YOUR CODE                         #
         #####################################################################
