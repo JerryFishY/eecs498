@@ -366,10 +366,10 @@ class FullyConnectedNet(object):
         # Replace "pass" statement with your code
         dim_list=[input_dim]+hidden_dims+[num_classes]
         for i in range(self.num_layers):
-            W=weight_scale*torch.randn(dim_list[i],dim_list[i+1],device=device,dtype=dtype)
-            b=torch.zeros(dim_list[i+1],dtype=dtype,device=device)
-            self.params[f'W{i+1}']=W
-            self.params[f'b{i+1}']=b
+          W=weight_scale*torch.randn(dim_list[i],dim_list[i+1],device=device,dtype=dtype)
+          b=torch.zeros(dim_list[i+1],dtype=dtype,device=device)
+          self.params[f'W{i+1}']=W
+          self.params[f'b{i+1}']=b
         #######################################################################
         #                         END OF YOUR CODE                            #
         #######################################################################

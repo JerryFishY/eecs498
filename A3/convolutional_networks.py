@@ -52,7 +52,23 @@ class Conv(object):
         ####################################################################
         # Replace "pass" statement with your code
         stride,pad=conv_param['stride'],conv_param['pad']
-        
+        N,C,H,W,HH,WW=x.shape[0],x.shape[1],x.shape[2],x.shape[3],w.shape[2],w.shape[3]
+        F=w.shape[0]
+        FH=int(1 + (H + 2 * pad - HH) / stride)
+        FW=int(1 + (W + 2 * pad - WW) / stride)
+
+        padded_input=torch.nn.functional.pad(x,(pad,pad,pad,pad),mode='constant',value=0)
+        out=torch.zeros((N,F,FH,FW),device=x.device,dtype=x.dtype)
+
+        for i in range(N):
+            for j in range(F):
+                for kf in range(FH):
+                  for kw in range(FW):
+                    out[i,j,kf,kw]=b[j]
+                    for c in range(C):
+                      for ki in range(HH):
+                          for kj in range(WW):
+                              out[i,j,kf,kw]+=w[j,c,ki,kj]*padded_input[i,c,ki+kf*stride,kj+kw*stride]
         #####################################################################
         #                          END OF YOUR CODE                         #
         #####################################################################
@@ -68,16 +84,54 @@ class Conv(object):
         - cache: A tuple of (x, w, b, conv_param) as in conv_forward_naive
 
         Returns a tuple of:
-        - dx: Gradient with respect to x
-        - dw: Gradient with respect to w
-        - db: Gradient with respect to b
+        - dx: Gradient with respect to x, shape (N, C, H, W)
+        - dw: Gradient with respect to w, shape (F, C, HH, WW)
+        - db: Gradient with respect to b, shape(F,)
         """
         dx, dw, db = None, None, None
         ###############################################################
         # TODO: Implement the convolutional backward pass.            #
         ###############################################################
         # Replace "pass" statement with your code
-        pass
+        x,w,b1,conv_param=cache
+        N,C,H,W=x.shape[0],x.shape[1],x.shape[2],x.shape[3]
+        F,HH,WW=w.shape[0],w.shape[2],w.shape[3]
+        FH,FW=dout.shape[2],dout.shape[3]
+        stride=conv_param['stride']
+        pad=conv_param['pad']
+        padded_input=torch.nn.functional.pad(x,(pad,pad,pad,pad),mode='constant',value=0)
+
+        dx=torch.zeros_like(x)
+        dw=torch.zeros_like(w)
+        db=torch.zeros_like(b1)
+        dx_p=torch.zeros_like(padded_input)
+
+        for a in range(F):
+            for b in range(C):
+                for f in range(HH):
+                    for d in range(WW):
+                        for n in range(N):
+                            for j in range(FH):
+                                for k in range(FW):
+                                      dw[a,b,f,d]+=dout[n,a,j,k]*padded_input[n,b,f+j*stride,d+k*stride]
+
+        for a in range(N):
+            for b in range(C):
+                for f in range(pad,H+pad):
+                    for d in range(pad,W+pad):
+                        for i in range(F):
+                            for j in range(dout.shape[2]):
+                                for k in range(dout.shape[3]):
+                                      if f-j*stride>=0 and f-j*stride<HH and d-k*stride>=0 and d-k*stride<WW:
+                                        dx_p[a,b,f,d]+=dout[a,i,j,k]*w[i,b,f-j*stride,d-k*stride] 
+        dx=dx_p[:,:,pad:H+pad,pad:W+pad]
+
+        for m in range(b1.shape[0]):
+          for n in range(N):
+            for j in range(dout.shape[2]):
+                for k in range(dout.shape[3]):
+                    db[m]+=dout[n,m,j,k]
+
         ###############################################################
         #                       END OF YOUR CODE                      #
         ###############################################################
@@ -110,7 +164,20 @@ class MaxPool(object):
         # TODO: Implement the max-pooling forward pass                     #
         ####################################################################
         # Replace "pass" statement with your code
-        pass
+        pool_height,pool_width,stride=pool_param['pool_height'],pool_param['pool_width'],pool_param['stride']
+        
+        N,C,H,W=x.shape[0],x.shape[1],x.shape[2],x.shape[3]
+        FH=int(1+(H-pool_height)/stride)
+        FW=int(1+(W-pool_width)/stride)
+        
+        out=torch.zeros((N,C,FH,FW),device=x.device,dtype=x.dtype)
+
+        for i in range(N):
+          for c in range(C):
+              for kf in range(FH):
+                for kw in range(FW):
+                  out[i,c,kf,kw]=torch.max(x[i,c,kf*stride:kf*stride+pool_height,kw*stride:kw*stride+pool_width])
+                  
         ####################################################################
         #                         END OF YOUR CODE                         #
         ####################################################################
@@ -132,7 +199,22 @@ class MaxPool(object):
         # TODO: Implement the max-pooling backward pass                     #
         #####################################################################
         # Replace "pass" statement with your code
-        pass
+        x,pool_param=cache
+        pool_height,pool_width,stride=pool_param['pool_height'],pool_param['pool_width'],pool_param['stride']
+        N,C,H,W=x.shape[0],x.shape[1],x.shape[2],x.shape[3]
+        FH=int(1+(H-pool_height)/stride)
+        FW=int(1+(W-pool_width)/stride)
+        dx=torch.zeros((N,C,H,W),device=x.device,dtype=x.dtype)
+
+        for i in range(N):
+          for c in range(C):
+              for kf in range(FH):
+                for kw in range(FW):
+                  _,index=torch.max(x[i,c,kf*stride:kf*stride+pool_height,kw*stride:kw*stride+pool_width].reshape(-1),dim=0)
+                  index0=int(index/pool_width)
+                  index1=index-index0*pool_width
+                  dx[i,c,kf*stride+index0,kw*stride+index1]=dout[i,c,kf,kw]
+                      
         ####################################################################
         #                          END OF YOUR CODE                        #
         ####################################################################
@@ -195,7 +277,17 @@ class ThreeLayerConvNet(object):
         # look at the start of the loss() function to see how that happens.  #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        num_channels,H,W=input_dims[0],input_dims[1],input_dims[2]
+        
+        self.params["W1"]=weight_scale*torch.randn((num_filters,num_channels,filter_size,filter_size),dtype=self.dtype,device=device)
+        self.params['b1']=torch.zeros(num_filters,dtype=self.dtype,device=device)
+        
+        self.params['W2']=weight_scale*torch.randn((num_filters*int(H/2)*int(W/2),hidden_dim),dtype=self.dtype,device=device)
+        self.params['b2']=torch.zeros(hidden_dim,dtype=self.dtype,device=device)
+
+        self.params['W3']=weight_scale*torch.randn((hidden_dim,num_classes),dtype=self.dtype,device=device)
+        self.params['b3']=torch.zeros(num_classes,dtype=self.dtype,device=device)
+        
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -244,7 +336,11 @@ class ThreeLayerConvNet(object):
         # above                                                              #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        print("X.shape: ",X.shape)
+        hidden,crp_cache=Conv_ReLU_Pool.forward(X,self.params['W1'],self.params['b1'],conv_param,pool_param)
+        print("hidden shape: ",hidden.shape)
+        hidden,lr_cache=Linear_ReLU.forward(hidden,self.params['W2'],self.params['b2'])
+        scores,l_cache=Linear.forward(hidden,self.params['W3'],self.params['b3'])
         ######################################################################
         #                             END OF YOUR CODE                       #
         ######################################################################
@@ -265,7 +361,17 @@ class ThreeLayerConvNet(object):
         # does not include a factor of 0.5                                 #
         ####################################################################
         # Replace "pass" statement with your code
-        pass
+        W1,b1,W2,b2,W3,b3=l_cache[1],l_cache[2],lr_cache[1],lr_cache[2],crp_cache[1],crp_cache[2]
+
+        loss,dout=softmax_loss(scores,y)
+        dout,grads['W3'],grads['b3']=Linear.backward(dout,l_cache)
+        
+        grads['W3'],grads['b3']+=2*self.reg*W3,2*self.reg*b3
+        grads['W2'],grads['b2']+=2*self.reg*W2,2*self.reg*b2
+        grads['W1'],grads['b1']+=2*self.reg*W1,2*self.reg*b1
+
+        dout,grads['W2'],grads['b2']=Linear_ReLU.backward(dout,lr_cache)
+        _,grads['W1'],grads['b1']=Conv_ReLU_Pool.backward(dout,crp_cache)
         ###################################################################
         #                             END OF YOUR CODE                    #
         ###################################################################
