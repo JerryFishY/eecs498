@@ -467,17 +467,24 @@ class DeepConvNet(object):
             else:
               self.params[f'W{i+1}']=kaiming_initializer(num_filters[i-1],num_filters[i],kernel_height,True,device=device,dtype=self.dtype)
             self.params[f'b{i+1}']=torch.zeros(num_filters[i],dtype=self.dtype,device=device)
-
+            if self.batchnorm:
+              self.params[f'gamma{i+1}']=torch.ones(num_filters[i],dtype=self.dtype,device=device)
+              self.params[f'beta{i+1}']=torch.zeros(num_filters[i],dtype=self.dtype,device=device)
+          
           self.params[f'W{self.num_layers}']=kaiming_initializer(num_filters[-1]*final_layer_height*final_layer_width,num_classes,None,True,device=device,dtype=self.dtype)
           self.params[f'b{self.num_layers}']=torch.zeros(num_classes,dtype=self.dtype,device=device)
+          
         
         else:
           for i in range(len(num_filters)):
-              if i==0:
-                self.params[f'W{i+1}']=weight_scale*torch.randn((num_filters[i],input_dims[0],kernel_height,kernel_width),dtype=self.dtype,device=device)
-              else:
-                self.params[f'W{i+1}']=weight_scale*torch.randn((num_filters[i],num_filters[i-1],kernel_height,kernel_width),dtype=self.dtype,device=device)
-              self.params[f'b{i+1}']=torch.zeros(num_filters[i],dtype=self.dtype,device=device)
+            if i==0:
+              self.params[f'W{i+1}']=weight_scale*torch.randn((num_filters[i],input_dims[0],kernel_height,kernel_width),dtype=self.dtype,device=device)
+            else:
+              self.params[f'W{i+1}']=weight_scale*torch.randn((num_filters[i],num_filters[i-1],kernel_height,kernel_width),dtype=self.dtype,device=device)
+            self.params[f'b{i+1}']=torch.zeros(num_filters[i],dtype=self.dtype,device=device)
+            if self.batchnorm:
+              self.params[f'gamma{i+1}']=torch.ones(num_filters[i],dtype=self.dtype,device=device)
+              self.params[f'beta{i+1}']=torch.zeros(num_filters[i],dtype=self.dtype,device=device)
           
           self.params[f'W{self.num_layers}']=weight_scale*torch.randn((num_filters[-1]*final_layer_height*final_layer_width,num_classes),dtype=self.dtype,device=device)
           self.params[f'b{self.num_layers}']=torch.zeros(num_classes,dtype=self.dtype,device=device)
@@ -591,11 +598,19 @@ class DeepConvNet(object):
         cache_list=[]
         for i in range(self.num_layers-1):
           if i in self.max_pools:
-            hidden,cache=Conv_ReLU_Pool.forward(hidden,self.params[f'W{i+1}'],self.params[f'b{i+1}'],conv_param,pool_param)
-            cache_list.append(cache)
+            if self.batchnorm:
+              hidden,cache=Conv_BatchNorm_ReLU_Pool.forward(hidden,self.params[f'W{i+1}'],self.params[f'b{i+1}'],self.params[f'gamma{i+1}'],self.params[f'beta{i+1}'],conv_param,self.bn_params[i],pool_param)
+              cache_list.append(cache)
+            else:
+              hidden,cache=Conv_ReLU_Pool.forward(hidden,self.params[f'W{i+1}'],self.params[f'b{i+1}'],conv_param,pool_param)
+              cache_list.append(cache)
           else:
-            hidden,cache=Conv_ReLU.forward(hidden,self.params[f'W{i+1}'],self.params[f'b{i+1}'],conv_param)
-            cache_list.append(cache)
+            if self.batchnorm:
+              hidden,cache=Conv_BatchNorm_ReLU.forward(hidden,self.params[f'W{i+1}'],self.params[f'b{i+1}'],self.params[f'gamma{i+1}'],self.params[f'beta{i+1}'],conv_param,self.bn_params[i])
+              cache_list.append(cache)
+            else:
+              hidden,cache=Conv_ReLU.forward(hidden,self.params[f'W{i+1}'],self.params[f'b{i+1}'],conv_param)
+              cache_list.append(cache)
         scores,cache=Linear.forward(hidden,self.params[f'W{self.num_layers}'],self.params[f'b{self.num_layers}'])
         cache_list.append(cache)
         #####################################################
@@ -627,12 +642,20 @@ class DeepConvNet(object):
 
         for i in range(self.num_layers-2,-1,-1):
             if i in self.max_pools:
-              dout,grads[f'W{i+1}'],grads[f'b{i+1}']=Conv_ReLU_Pool.backward(dout,cache_list[i])
-              grads[f'W{i+1}']+=2*self.reg*cache_list[i][0][1]
+              if self.batchnorm:
+                dout,grads[f'W{i+1}'],grads[f'b{i+1}'],grads[f'gamma{i+1}'],grads[f'beta{i+1}']=Conv_BatchNorm_ReLU_Pool.backward(dout,cache_list[i])
+                grads[f'W{i+1}']+=2*self.reg*cache_list[i][0][1]
+              else:
+                dout,grads[f'W{i+1}'],grads[f'b{i+1}']=Conv_ReLU_Pool.backward(dout,cache_list[i])
+                grads[f'W{i+1}']+=2*self.reg*cache_list[i][0][1]
               
             else:
-              dout,grads[f'W{i+1}'],grads[f'b{i+1}']=Conv_ReLU.backward(dout,cache_list[i])
-              grads[f'W{i+1}']+=2*self.reg*cache_list[i][0][1]
+              if self.batchnorm:
+                dout,grads[f'W{i+1}'],grads[f'b{i+1}'],grads[f'gamma{i+1}'],grads[f'beta{i+1}']=Conv_BatchNorm_ReLU.backward(dout,cache_list[i])
+                grads[f'W{i+1}']+=2*self.reg*cache_list[i][0][1]
+              else:
+                dout,grads[f'W{i+1}'],grads[f'b{i+1}']=Conv_ReLU.backward(dout,cache_list[i])
+                grads[f'W{i+1}']+=2*self.reg*cache_list[i][0][1]
               
         #############################################################
         #                       END OF YOUR CODE                    #
@@ -838,7 +861,14 @@ class BatchNorm(object):
             # (https://arxiv.org/abs/1502.03167) might prove to be helpful.  #
             ##################################################################
             # Replace "pass" statement with your code
-            pass
+            mean=x.mean(dim=0)
+            var=1 / N * torch.sum((x - mean) ** 2, dim=0)
+            out=gamma*(x-mean)/torch.sqrt(var+eps)+beta
+            sqr_var=torch.sqrt(var+eps)
+            running_mean=momentum*running_mean+(1-momentum)*mean
+            running_var=momentum*running_var+(1-momentum)*var
+
+            cache=(x,mean,sqr_var,gamma,beta,bn_param)
             ################################################################
             #                           END OF YOUR CODE                   #
             ################################################################
@@ -851,7 +881,7 @@ class BatchNorm(object):
             # in the out variable.                                         #
             ################################################################
             # Replace "pass" statement with your code
-            pass
+            out=gamma*(x-running_mean)/torch.sqrt(running_var+eps)+beta
             ################################################################
             #                      END OF YOUR CODE                        #
             ################################################################
@@ -893,7 +923,33 @@ class BatchNorm(object):
         # Don't forget to implement train and test mode separately.         #
         #####################################################################
         # Replace "pass" statement with your code
-        pass
+        x,mean,sqrvar,gamma,beta,bn_param=cache
+        
+
+        N=x.shape[0]
+        
+        dgamma=(dout*(x-mean)/sqrvar).sum(dim=0)
+        dbeta=dout.sum(dim=0)
+        
+        dxhat=gamma*dout
+        dxmul1=dxhat/sqrvar
+        
+        divar=(dxhat*(x-mean)).sum(dim=0)
+        dsqrtvar=-divar/sqrvar**2
+        dvar=dsqrtvar*0.5*1/sqrvar
+        dsq=(1/N*torch.ones(x.shape,device=x.device) *dvar)
+        dxmul2=2*(x-mean)*dsq
+
+        dx1=dxmul1+dxmul2
+
+        dmu=-1*torch.sum(dxmul1+dxmul2,dim=0)
+        
+        dx2=1/N*torch.ones(x.shape,device=x.device) *dmu
+        
+        dx=dx1+dx2
+        
+        
+
         #################################################################
         #                      END OF YOUR CODE                         #
         #################################################################
@@ -926,7 +982,19 @@ class BatchNorm(object):
         # single 80-character line.                                       #
         ###################################################################
         # Replace "pass" statement with your code
-        pass
+        x,mean,sqrvar,gamma,beta,bn_param=cache
+        
+        N=x.shape[0]
+        dxhat=gamma*dout
+        dx1=-(dxhat*(x-mean)).sum(dim=0)*(x-mean)/(N*sqrvar**3)
+        dx2=dxhat/sqrvar
+        dx3=-(1/(N*sqrvar)*dxhat).sum(dim=0)
+        # dx = dxhat / sqrvar - torch.sum(dxhat, dim=0) / N / sqrvar - (x-mean) * torch.sum(dxhat * (x-mean), dim=0) / N / (sqrvar ** 3)
+        
+        dx=dx1+dx3+dx2
+        
+        dgamma=(dout*(x-mean)/sqrvar).sum(dim=0)
+        dbeta=dout.sum(dim=0)
         #################################################################
         #                        END OF YOUR CODE                       #
         #################################################################
@@ -974,7 +1042,10 @@ class SpatialBatchNorm(object):
         # ours is less than five lines.                                #
         ################################################################
         # Replace "pass" statement with your code
-        pass
+        N,C,H,W=x.shape[0],x.shape[1],x.shape[2],x.shape[3]
+        x = x.permute(0, 2, 3, 1).reshape(N * H * W, C)
+        out,cache=BatchNorm.forward(x, gamma, beta, bn_param)
+        out = out.reshape(N, H, W, C).permute(0, 3, 1, 2).contiguous()
         ################################################################
         #                       END OF YOUR CODE                       #
         ################################################################
@@ -1005,7 +1076,10 @@ class SpatialBatchNorm(object):
         # ours is less than five lines.                                 #
         #################################################################
         # Replace "pass" statement with your code
-        pass
+        N,C,H,W=dout.shape[0],dout.shape[1],dout.shape[2],dout.shape[3]
+        dout = dout.permute(0, 2, 3, 1).reshape(N * H * W, C)
+        dx,dgamma,dbeta=BatchNorm.backward(dout.reshape(N*H*W,C),cache)
+        dx = dx.reshape(N, H, W, C).permute(0, 3, 1, 2).contiguous()
         ##################################################################
         #                       END OF YOUR CODE                         #
         ##################################################################
