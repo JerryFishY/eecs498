@@ -57,14 +57,16 @@ def three_layer_convnet(x, params):
   # TODO: Implement the forward pass for the three-layer ConvNet.              
   # The network have the following architecture:                               
   # 1. Conv layer (with bias) with 32 5x5 filters, with zero-padding of 2     
-  #   2. ReLU                                                                  
+  # 2. ReLU                                                                  
   # 3. Conv layer (with bias) with 16 3x3 filters, with zero-padding of 1     
   # 4. ReLU                                                                   
   # 5. Fully-connected layer (with bias) to compute scores for 10 classes    
   # Hint: F.linear, F.conv2d, F.relu, flatten (implemented above)                                   
   ##############################################################################
   # Replace "pass" statement with your code
-  pass
+  hidden=F.relu(F.conv2d(x, conv_w1, conv_b1, padding=2))
+  hidden2=F.relu(F.conv2d(hidden, conv_w2, conv_b2, padding=(1,1)))
+  scores=F.linear(flatten(hidden2), fc_w, fc_b)
   ##############################################################################
   #                                 END OF YOUR CODE                             
   ##############################################################################
@@ -105,7 +107,24 @@ def initialize_three_layer_conv_part2(dtype=torch.float, device='cpu'):
   # You are given all the necessary variables above for initializing weights. 
   ##############################################################################
   # Replace "pass" statement with your code
-  pass
+  conv_w1=torch.empty((channel_1,C,kernel_size_1,kernel_size_1),dtype=dtype,device=device,requires_grad=True)
+  conv_w2=torch.empty((channel_2,channel_1,kernel_size_2,kernel_size_2),dtype=dtype,device=device,requires_grad=True)
+  conv_b1=torch.empty((channel_1),dtype=dtype,device=device,requires_grad=True)
+  conv_b2=torch.empty((channel_2),dtype=dtype,device=device,requires_grad=True)
+  Hfc=H-kernel_size_1-kernel_size_2+8
+  Wfc=W-kernel_size_1-kernel_size_2+8
+  
+  fc_w=torch.empty((num_classes,channel_2*Hfc*Wfc),dtype=dtype,device=device,requires_grad=True)
+  fc_b=torch.empty((num_classes),dtype=dtype,device=device,requires_grad=True)
+
+  nn.init.kaiming_normal_(conv_w1)
+  nn.init.kaiming_normal_(conv_w2)
+  nn.init.kaiming_normal_(fc_w)
+  nn.init.zeros_(conv_b1)
+  nn.init.zeros_(conv_b2)
+  nn.init.zeros_(fc_b)
+
+
   ##############################################################################
   #                                 END OF YOUR CODE                            
   ##############################################################################
@@ -140,7 +159,13 @@ class ThreeLayerConvNet(nn.Module):
     # HINT: nn.Conv2d, nn.init.kaiming_normal_, nn.init.zeros_            
     ############################################################################
     # Replace "pass" statement with your code
-    pass
+    self.conv1=nn.Conv2d(in_channels=in_channel,out_channels=channel_1,kernel_size=5,padding=2)
+    self.conv2=nn.Conv2d(in_channels=channel_1,out_channels=channel_2,kernel_size=3,padding=1)
+    self.fc=nn.Linear(channel_2*32*32,num_classes)
+    nn.init.kaiming_normal_(self.conv1.weight)
+    nn.init.kaiming_normal_(self.conv2.weight)
+    nn.init.zeros_(self.conv1.bias)
+    nn.init.zeros_(self.conv2.bias)
     ############################################################################
     #                           END OF YOUR CODE                            
     ############################################################################
@@ -154,7 +179,9 @@ class ThreeLayerConvNet(nn.Module):
     # Hint: flatten (implemented at the start of part II)                          
     ############################################################################
     # Replace "pass" statement with your code
-    pass
+    hidden=F.relu(self.conv2(F.relu(self.conv1(x))))
+    hidden=flatten(hidden)
+    scores=self.fc(hidden)
     ############################################################################
     #                            END OF YOUR CODE                          
     ############################################################################
@@ -186,7 +213,8 @@ def initialize_three_layer_conv_part3():
   # momentum, with L2 weight decay of 1e-4.                    
   ##############################################################################
   # Replace "pass" statement with your code
-  pass
+  model=ThreeLayerConvNet(C,channel_1,channel_2,num_classes)
+  optimizer=optim.SGD(model.parameters(),lr=learning_rate,weight_decay=weight_decay)
   ##############################################################################
   #                                 END OF YOUR CODE                            
   ##############################################################################
