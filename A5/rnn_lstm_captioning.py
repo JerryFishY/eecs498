@@ -332,7 +332,12 @@ class WordEmbedding(nn.Module):
         # TODO: Implement the forward pass for word embeddings.
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        N,T,D=x.shape[0],x.shape[1],self.W_embed.shape[1]
+        out=torch.zeros((N,T,D),device=self.W_embed.device,dtype=self.W_embed.dtype)
+        for n in range(N):
+            for t in range(T):
+                out[n,t]=self.W_embed[x[n,t]]
+
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -377,7 +382,7 @@ def temporal_softmax_loss(x, y, ignore_index=None):
     # all timesteps and *averaging* across the minibatch.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    loss=torch.nn.functional.cross_entropy(x.reshape(-1,x.shape[2]),y.reshape(-1),ignore_index=ignore_index,reduction='sum')/x.shape[0]
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -448,7 +453,13 @@ class CaptioningRNN(nn.Module):
         # (2) feature projection (from CNN pooled feature to h0)
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        V=len(word_to_idx)
+        self.input_projection=nn.Linear(input_dim,hidden_dim)
+        self.image_encoder=ImageEncoder(pretrained=image_encoder_pretrained)
+        self.rnn=RNN(wordvec_dim,hidden_dim)
+        self.word_embedding=WordEmbedding(V,wordvec_dim)
+        self.output_projection=nn.Linear(hidden_dim,V)
+
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -499,7 +510,12 @@ class CaptioningRNN(nn.Module):
         # Do not worry about regularizing the weights or their gradients!
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        latent_feature=self.image_encoder(images)
+        h0=self.input_projection(latent_feature.mean(dim=(2,3)))
+        x=self.word_embedding(captions_in)
+        out=self.rnn(x,h0)
+        scores=self.output_projection(out)
+        loss=temporal_softmax_loss(scores,captions_out,ignore_index=self.ignore_index)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -561,7 +577,21 @@ class CaptioningRNN(nn.Module):
         # would both be A.mean(dim=(2, 3)).
         #######################################################################
         # Replace "pass" statement with your code
-        pass
+        prev_hidden=self.input_projection(self.image_encoder(images).mean(dim=(2,3)))
+        prev_words=self._start * images.new(N,1).fill_(1).long()
+        vocab_size,N=len(self.word_to_idx),prev_hidden.shape[0]
+        
+        captions[:,0]=prev_words.reshape(-1)
+        
+        for t in range(1,max_length):
+            x=self.word_embedding(prev_words)
+            now_hidden=self.rnn(x,prev_hidden)
+            scores=self.output_projection(now_hidden)
+            scores=scores.reshape(N,-1)
+            prev_words=torch.argmax(scores,dim=1)
+            prev_hidden=now_hidden.reshape(N,-1)
+            captions[:,t]=prev_words
+            prev_words=prev_words.reshape(-1,1)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
