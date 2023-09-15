@@ -332,12 +332,7 @@ class WordEmbedding(nn.Module):
         # TODO: Implement the forward pass for word embeddings.
         ######################################################################
         # Replace "pass" statement with your code
-        N,T,D=x.shape[0],x.shape[1],self.W_embed.shape[1]
-        out=torch.zeros((N,T,D),device=self.W_embed.device,dtype=self.W_embed.dtype)
-        for n in range(N):
-            for t in range(T):
-                out[n,t]=self.W_embed[x[n,t]]
-
+        out = self.W_embed[x]
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -454,9 +449,15 @@ class CaptioningRNN(nn.Module):
         ######################################################################
         # Replace "pass" statement with your code
         V=len(word_to_idx)
-        self.input_projection=nn.Linear(input_dim,hidden_dim)
+        
         self.image_encoder=ImageEncoder(pretrained=image_encoder_pretrained)
-        self.rnn=RNN(wordvec_dim,hidden_dim)
+        self.input_projection=nn.Linear(input_dim,hidden_dim)
+        
+        if cell_type=='rnn':
+            self.net=RNN(wordvec_dim,hidden_dim)
+        elif cell_type=='lstm':
+            self.net=LSTM(wordvec_dim,hidden_dim)
+
         self.word_embedding=WordEmbedding(V,wordvec_dim)
         self.output_projection=nn.Linear(hidden_dim,V)
 
@@ -513,7 +514,7 @@ class CaptioningRNN(nn.Module):
         latent_feature=self.image_encoder(images)
         h0=self.input_projection(latent_feature.mean(dim=(2,3)))
         x=self.word_embedding(captions_in)
-        out=self.rnn(x,h0)
+        out=self.net(x,h0)
         scores=self.output_projection(out)
         loss=temporal_softmax_loss(scores,captions_out,ignore_index=self.ignore_index)
         ######################################################################
@@ -578,20 +579,24 @@ class CaptioningRNN(nn.Module):
         #######################################################################
         # Replace "pass" statement with your code
         prev_hidden=self.input_projection(self.image_encoder(images).mean(dim=(2,3)))
-        prev_words=self._start * images.new(N,1).fill_(1).long()
-        vocab_size,N=len(self.word_to_idx),prev_hidden.shape[0]
-        
-        captions[:,0]=prev_words.reshape(-1)
-        
-        for t in range(1,max_length):
-            x=self.word_embedding(prev_words)
-            now_hidden=self.rnn(x,prev_hidden)
+        prev_words=self._start * images.new(N).fill_(1).long()
+        prev_cell=torch.zeros_like(prev_hidden)
+        captions[:,0]=prev_words
+        for t in range(max_length):
+            x=self.word_embedding(prev_words.reshape(-1,1)).reshape(N,-1)
+            if self.cell_type=='rnn':
+                now_hidden=self.net.step_forward(x,prev_hidden)
+            elif self.cell_type=='lstm':
+                now_hidden,now_cell=self.net.step_forward(x,prev_hidden,prev_cell)
+                prev_cell=now_cell
             scores=self.output_projection(now_hidden)
-            scores=scores.reshape(N,-1)
             prev_words=torch.argmax(scores,dim=1)
-            prev_hidden=now_hidden.reshape(N,-1)
             captions[:,t]=prev_words
-            prev_words=prev_words.reshape(-1,1)
+            prev_hidden=now_hidden
+        
+        
+            
+
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -652,7 +657,14 @@ class LSTM(nn.Module):
         ######################################################################
         next_h, next_c = None, None
         # Replace "pass" statement with your code
-        pass
+        hidden_dim=prev_h.shape[1]
+        activation=torch.mm(x,self.Wx)+torch.mm(prev_h,self.Wh)+self.b
+        i=torch.sigmoid(activation[:,:hidden_dim])
+        f=torch.sigmoid(activation[:,hidden_dim:2*hidden_dim])
+        o=torch.sigmoid(activation[:,2*hidden_dim:3*hidden_dim])
+        g=torch.tanh(activation[:,3*hidden_dim:])
+        next_c=f*prev_c+i*g
+        next_h=o*torch.tanh(next_c)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -686,7 +698,12 @@ class LSTM(nn.Module):
         ######################################################################
         hn = None
         # Replace "pass" statement with your code
-        pass
+        N,T,H=x.shape[0],x.shape[1],h0.shape[1]
+        hn=torch.zeros((N,T,H),dtype=x.dtype,device=x.device)
+        h_next,c_next=h0,c0
+        for t in range(T):
+            h_next,c_next=self.step_forward(x[:,t,:],h_next,c_next)
+            hn[:,t,:]=h_next
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -717,7 +734,7 @@ def dot_product_attention(prev_h, A):
     # functions. HINT: Make sure you reshape attn_weights back to (N, 4, 4)! #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
