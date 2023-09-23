@@ -33,7 +33,10 @@ def generate_token_dict(vocab):
     # elements in between as consequetive number.                                #
     ##############################################################################
     # Replace "pass" statement with your code
-    pass
+    index=0
+    for token in vocab:
+        token_dict[token]=index
+        index+=1
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -74,7 +77,12 @@ def prepocess_input_sequence(
     # appropriate value for the complete token.
     ##############################################################################
     # Replace "pass" statement with your code
-    pass
+    for token in input_str.split(' '):
+        if token in spc_tokens:
+            out.append(token_dict[token])
+        else:
+            for char in token:
+                out.append(token_dict[char])
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -116,7 +124,15 @@ def scaled_dot_product_two_loop_single(
     # using weighted sum becomes an output to the Kth query vector                #
     ###############################################################################
     # Replace "pass" statement with your code
-    pass
+    K,M=query.shape
+    hidden=torch.zeros(K,K)
+    out=torch.zeros(K,M)
+    for i in range(K):
+        for j in range(K):
+           hidden[i,j]=torch.dot(query[i],key[j])
+        hidden[i]/=torch.sqrt(torch.tensor(M))
+        hidden[i]=F.softmax(hidden[i])
+        out[i]=torch.mv(value.t(),hidden[i])
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -163,7 +179,15 @@ def scaled_dot_product_two_loop_batch(
     # Hint: look at torch.bmm                                                     #
     ###############################################################################
     # Replace "pass" statement with your code
-    pass
+    hidden=torch.zeros(N,K,K)
+    out=torch.zeros(N,K,M)
+    for i in range(K):
+        for j in range(K):
+           hidden[:,i,j]=torch.bmm(query[:,i,:].reshape(N,1,-1),key[:,j,:].reshape(N,-1,1)).reshape(N)
+        hidden[:,i,:]/=torch.sqrt(torch.tensor(M))
+        hidden[:,i,:]=F.softmax(hidden[:,i,:],dim=1)
+        out[:,i,:]=torch.bmm(value.permute(0,2,1),hidden[:,i,:].reshape(N,-1,1)).reshape(N,M)
+
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -227,7 +251,9 @@ def scaled_dot_product_no_loop_batch(
         # Replace "pass" statement with your code
         pass
     # Replace "pass" statement with your code
-    pass
+    else:
+        weights_softmax=F.softmax(torch.bmm(query,key.permute(0,2,1))/torch.tensor(M).sqrt(),dim=2)
+        y=torch.bmm(weights_softmax,value)
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -245,7 +271,7 @@ class SelfAttention(nn.Module):
         
         args:
             dim_in: an int value for input sequence embedding dimension
-            dim_q: an int value for output dimension of query and ley vector
+            dim_q: an int value for output dimension of query and key vector
             dim_v: an int value for output dimension for value vectors
 
         """
@@ -268,7 +294,12 @@ class SelfAttention(nn.Module):
         # as given above. self.q, self.k, and self.v respectively.               #
         ##########################################################################
         # Replace "pass" statement with your code
-        pass
+        self.q=nn.Linear(dim_in,dim_q)
+        self.q.weight.data=torch.rand(dim_q,dim_in)*torch.sqrt(torch.tensor(6/(dim_in+dim_q)))
+        self.k=nn.Linear(dim_in,dim_q)
+        self.k.weight.data=torch.rand(dim_q,dim_in)*torch.sqrt(torch.tensor(6/(dim_in+dim_q)))
+        self.v=nn.Linear(dim_in,dim_v)
+        self.v.weight.data=torch.rand(dim_v,dim_in)*torch.sqrt(torch.tensor(6/(dim_in+dim_v)))
         ##########################################################################
         #               END OF YOUR CODE                                         #
         ##########################################################################
@@ -295,7 +326,7 @@ class SelfAttention(nn.Module):
         ##########################################################################
         # TODO: Use the functions initialized in the init fucntion to find the   #
         # output tensors. Precisely, pass the inputs query, key and value to the #
-        #  three functions iniitalized above. Then, pass these three transformed #
+        #  three functions initalized above. Then, pass these three transformed #
         # query,  key and value tensors to the self_attention_no_loop_batch to   #
         # get the final output. For now, dont worry about the mask and just      #
         # pass it as a variable in self_attention_no_loop_batch. Assign the value#
@@ -303,7 +334,11 @@ class SelfAttention(nn.Module):
         # variable self.weights_softmax                                          #
         ##########################################################################
         # Replace "pass" statement with your code
-        pass
+        N=query.shape[0]
+        query_flatten=self.q(query)
+        key_flatten=self.k(key)
+        value_flatten=self.v(value)
+        y,self.weights_softmax=scaled_dot_product_no_loop_batch(query_flatten,key_flatten,value_flatten,mask)
         ##########################################################################
         #               END OF YOUR CODE                                         #
         ##########################################################################
@@ -354,7 +389,9 @@ class MultiHeadAttention(nn.Module):
         # SelfAttention.                                                         #
         ##########################################################################
         # Replace "pass" statement with your code
-        pass
+        self.projection_layer=nn.ModuleList([SelfAttention(dim_in,dim_out,dim_out) for i in range(num_heads)])
+        self.output_layer=nn.Linear(num_heads*dim_out,dim_in)
+        self.output_layer.weight.data=(torch.rand(dim_in,num_heads*dim_out)-0.5)*2*torch.sqrt(torch.tensor(6/(dim_in+dim_out)))
         ##########################################################################
         #               END OF YOUR CODE                                         #
         ##########################################################################
@@ -398,7 +435,10 @@ class MultiHeadAttention(nn.Module):
         # nn.Linear mapping function defined in the initialization step.         #
         ##########################################################################
         # Replace "pass" statement with your code
-        pass
+        hidden=[self.projection_layer[i](query,key,value,mask) for i in range(len(self.projection_layer))]
+        hidden=torch.cat(hidden,dim=2)
+        print(hidden.shape)
+        y=self.output_layer(hidden)
         ##########################################################################
         #               END OF YOUR CODE                                         #
         ##########################################################################
