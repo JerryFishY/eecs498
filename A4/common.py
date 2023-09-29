@@ -84,7 +84,19 @@ class DetectorBackboneWithFPN(nn.Module):
         self.fpn_params = nn.ModuleDict()
 
         # Replace "pass" statement with your code
-        pass
+        p3_in_channels=dummy_out['c3'].shape[1]
+        p4_in_channels=dummy_out['c4'].shape[1]
+        p5_in_channels=dummy_out['c5'].shape[1]
+
+        self.fpn_params['p3_conv_lateral']=nn.Conv2d(in_channels=p3_in_channels,out_channels=out_channels,kernel_size=1,stride=1,padding=0)
+        self.fpn_params['p4_conv_lateral']=nn.Conv2d(in_channels=p4_in_channels,out_channels=out_channels,kernel_size=1,stride=1,padding=0)
+        self.fpn_params['p5_conv_lateral']=nn.Conv2d(in_channels=p5_in_channels,out_channels=out_channels,kernel_size=1,stride=1,padding=0)
+
+        self.fpn_params['p3_conv_output']=nn.Conv2d(in_channels=out_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1)
+        self.fpn_params['p4_conv_output']=nn.Conv2d(in_channels=out_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1)
+        self.fpn_params['p5_conv_output']=nn.Conv2d(in_channels=out_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1)
+
+
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -111,7 +123,19 @@ class DetectorBackboneWithFPN(nn.Module):
         ######################################################################
 
         # Replace "pass" statement with your code
-        pass
+        p3_lateral=self.fpn_params['p3_conv_lateral'](backbone_feats['c3'])
+        p4_lateral=self.fpn_params['p4_conv_lateral'](backbone_feats['c4'])
+        p5_lateral=self.fpn_params['p5_conv_lateral'](backbone_feats['c5'])
+
+        up_rate3_4=self.fpn_strides['p4']//self.fpn_strides['p3']
+        up_rate4_5=self.fpn_strides['p5']//self.fpn_strides['p4']
+
+        p4_lateral=F.interpolate(p5_lateral,scale_factor=up_rate4_5,mode='nearest')+p4_lateral
+        p3_lateral=F.interpolate(p4_lateral,scale_factor=up_rate3_4,mode='nearest')+p3_lateral
+        
+        fpn_feats['p3']=self.fpn_params['p3_conv_output'](p3_lateral)
+        fpn_feats['p4']=self.fpn_params['p4_conv_output'](p4_lateral)
+        fpn_feats['p5']=self.fpn_params['p5_conv_output'](p5_lateral)
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################

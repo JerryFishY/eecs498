@@ -28,9 +28,7 @@ class FCOSPredictionNetwork(nn.Module):
     We will use feature maps from FPN levels (P3, P4, P5) and exclude (P6, P7).
     """
 
-    def __init__(
-        self, num_classes: int, in_channels: int, stem_channels: List[int]
-    ):
+    def __init__(self, num_classes: int, in_channels: int, stem_channels: List[int]):
         """
         Args:
             num_classes: Number of object classes for classification.
@@ -60,8 +58,21 @@ class FCOSPredictionNetwork(nn.Module):
         stem_cls = []
         stem_box = []
         # Replace "pass" statement with your code
-        pass
 
+        for i in range(len(stem_channels)):
+            if i == 0:
+                layer = nn.Conv2d(in_channels, stem_channels[i], 3, 1, 1)
+                torch.nn.init.normal_(layer.weight, mean=0, std=0.01)
+                torch.nn.init.constant_(layer.bias, 0)
+                stem_cls.append(layer)
+                stem_cls.append(nn.ReLU())
+            else:
+                layer = nn.Conv2d(stem_channels[i - 1], stem_channels[i], 3, 1, 1)
+                torch.nn.init.normal_(layer.weight, mean=0, std=0.01)
+                torch.nn.init.constant_(layer.bias, 0)
+                stem_cls.append(layer)
+                stem_cls.append(nn.ReLU())
+        stem_box=stem_cls.copy()
         # Wrap the layers defined by student into a `nn.Sequential` module:
         self.stem_cls = nn.Sequential(*stem_cls)
         self.stem_box = nn.Sequential(*stem_box)
@@ -88,7 +99,9 @@ class FCOSPredictionNetwork(nn.Module):
         self.pred_ctr = None  # Centerness conv
 
         # Replace "pass" statement with your code
-        pass
+        self.pred_cls = nn.Conv2d(stem_channels[-1], num_classes, 3, 1, 1)
+        self.pred_box = nn.Conv2d(stem_channels[-1], 4, 3, 1, 1)
+        self.pred_ctr = nn.Conv2d(stem_channels[-1], 1, 3, 1, 1)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -135,7 +148,13 @@ class FCOSPredictionNetwork(nn.Module):
         centerness_logits = {}
 
         # Replace "pass" statement with your code
-        pass
+        levels={'p3','p4','p5'}
+        for level in levels:
+            hidden_feat=self.stem_cls(feats_per_fpn_level[level])
+            hidden_box=self.stem_box(feats_per_fpn_level[level])
+            class_logits[level]=self.pred_cls(hidden_feat)
+            boxreg_deltas[level]=self.pred_box(hidden_box)
+            centerness_logits[level]=self.pred_ctr(hidden_box)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -185,7 +204,6 @@ def fcos_match_locations_to_gt(
 
     # Do this matching individually per FPN level.
     for level_name, centers in locations_per_fpn_level.items():
-
         # Get stride for this FPN level.
         stride = strides_per_fpn_level[level_name]
 
@@ -207,14 +225,10 @@ def fcos_match_locations_to_gt(
 
         lower_bound = stride * 4 if level_name != "p3" else 0
         upper_bound = stride * 8 if level_name != "p5" else float("inf")
-        match_matrix &= (pairwise_dist > lower_bound) & (
-            pairwise_dist < upper_bound
-        )
+        match_matrix &= (pairwise_dist > lower_bound) & (pairwise_dist < upper_bound)
 
         # Match the GT box with minimum area, if there are multiple GT matches.
-        gt_areas = (gt_boxes[:, 2] - gt_boxes[:, 0]) * (
-            gt_boxes[:, 3] - gt_boxes[:, 1]
-        )
+        gt_areas = (gt_boxes[:, 2] - gt_boxes[:, 0]) * (gt_boxes[:, 3] - gt_boxes[:, 1])
 
         # Get matches and their labels using match quality matrix.
         match_matrix = match_matrix.to(torch.float32)
@@ -359,9 +373,7 @@ class FCOS(nn.Module):
     training and predicts boxes during inference.
     """
 
-    def __init__(
-        self, num_classes: int, fpn_channels: int, stem_channels: List[int]
-    ):
+    def __init__(self, num_classes: int, fpn_channels: int, stem_channels: List[int]):
         super().__init__()
         self.num_classes = num_classes
 
@@ -553,7 +565,6 @@ class FCOS(nn.Module):
         pred_scores_all_levels = []
 
         for level_name in locations_per_fpn_level.keys():
-
             # Get locations and predictions from a single level.
             # We index predictions by `[0]` to remove batch dimension.
             level_locations = locations_per_fpn_level[level_name]

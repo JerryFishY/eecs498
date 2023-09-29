@@ -7,3 +7,7 @@ mnist*/
 *.pth
 *.json
 *.pkl
+*/mAP
+*/VOCdevkit
+*/__pycache__
+*.tar
