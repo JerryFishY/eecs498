@@ -11,7 +11,7 @@ from torch import nn
 from torch.nn import functional as F
 from torchvision import models
 from torchvision.models import feature_extraction
-
+import torchvision
 
 def hello_common():
     print("Hello from common.py!")
@@ -181,7 +181,12 @@ def get_fpn_location_coords(
         # TODO: Implement logic to get location co-ordinates below.          #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        B,C,H,W=feat_shape
+        location_coords[level_name]=torch.zeros((H*W,2),dtype=dtype,device=device)
+        for i in range(H):
+            for j in range(W):
+                location_coords[level_name][i*W+j,0]=i*level_stride+level_stride//2
+                location_coords[level_name][i*W+j,1]=j*level_stride+level_stride//2
         ######################################################################
         #                             END OF YOUR CODE                       #
         ######################################################################
@@ -220,7 +225,20 @@ def nms(boxes: torch.Tensor, scores: torch.Tensor, iou_threshold: float = 0.5):
     # github.com/pytorch/vision/blob/main/torchvision/csrc/ops/cpu/nms_kernel.cpp
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+    sorted_indices=torch.argsort(scores,descending=True)
+    sorted_boxes=boxes[sorted_indices]
+    keep=[]
+    while(len(sorted_indices)):
+        keep.append(sorted_indices[0])
+        ious=torchvision.ops.box_iou(sorted_boxes[0].unsqueeze(0),sorted_boxes[1:]).reshape(-1)
+
+        sorted_boxes=sorted_boxes[1:]
+        sorted_indices=sorted_indices[1:]
+
+        sorted_indices=sorted_indices[ious<=iou_threshold]
+        sorted_boxes=sorted_boxes[ious<=iou_threshold]
+        
+    keep=torch.tensor(keep,dtype=torch.long,device=boxes.device)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
