@@ -11,3 +11,4 @@ mnist*/
 */VOCdevkit
 */__pycache__
 *.tar
+*/MNIST_data

@@ -32,7 +32,17 @@ class VAE(nn.Module):
         # be tensors of shape (N, Z).                                             #
         ###########################################################################
         # Replace "pass" statement with your code
-        pass
+        self.encoder=nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(self.input_size,self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim,self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim,self.hidden_dim),
+            nn.ReLU()
+        )
+        self.mu_layer=nn.Linear(self.hidden_dim,self.latent_size)
+        self.logvar_layer=nn.Linear(self.hidden_dim,self.latent_size)
         ###########################################################################
         # TODO: Implement the fully-connected decoder architecture described in   #
         # the notebook. Specifically, self.decoder should be a network that inputs#
@@ -40,7 +50,18 @@ class VAE(nn.Module):
         # estimated images of shape (N, 1, H, W).                                 #
         ###########################################################################
         # Replace "pass" statement with your code
-        pass
+        self.H,self.W=torch.sqrt(torch.tensor(self.input_size)).int(),torch.sqrt(torch.tensor(self.input_size)).int()
+        self.decoder=nn.Sequential(
+            nn.Linear(self.latent_size,self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim,self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim,self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim,self.input_size),
+            nn.Sigmoid(),
+            nn.Unflatten(dim=1,unflattened_size=(1,self.H,self.W))
+        )
         ###########################################################################
         #                                      END OF YOUR CODE                   #
         ###########################################################################
@@ -71,7 +92,7 @@ class VAE(nn.Module):
         # (3) Pass z through the decoder to resconstruct x                        #
         ###########################################################################
         # Replace "pass" statement with your code
-        pass
+
         ###########################################################################
         #                                      END OF YOUR CODE                   #
         ###########################################################################
